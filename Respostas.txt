@@ -178,7 +178,7 @@ if __name__ == '__main__':
 
 
 
-O problemas eram, o código contém username == 'admin' and password == '1234', com as senhas hardcoded.
+Os problemas eram, o código contém username == 'admin' and password == '1234', com as senhas hardcoded.
 Se a autenticação estivesse ligada a um banco de dados sem prepared statements, poderia ser vulnerável a SQL Injection.
 Executar app.run(debug=True) expõe informações sensíveis em caso de erro.
 O código não limita tentativas de login(pode tentar infinitas combinações de senhas)
