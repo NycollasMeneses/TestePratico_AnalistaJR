@@ -1,0 +1,202 @@
+1 - O dataset  pode ficar desbalanceado quando as distribuições das classes do problema tem um volume que seja maior que o outro. 
+Isso pode fazer com que o modelo aprenda a priorizar a classe com maior volume e tenha dificuldades em identificar os cenarios com o menor volume. 
+Com esse problema, pode apresentar uma alta acurácia, mas com um baixo desempenho na classificação da classe com menor volume que em alguns cenarios é algo critico
+
+Existem algumas soluções para esse problema, aumentar a base da classe com menor volume, ou diminuir o volume da classe maior.
+Podemos tambem alterar as metricas de avaliação, fungindo um pouco do foco da acuracia, que ai existem alguns outros, como f1-score, recall e etc. 
+
+
+2- 
+Código : 
+
+
+import pandas as pd
+
+# Ler o arquivo CSV
+df = pd.read_csv("vendas.csv")
+
+# Calcular o faturamento total por produto
+df["faturamento"] = df["quantidade"] * df["preco_unitario"]
+faturamento_por_produto = df.groupby("produto")["faturamento"].sum()
+
+# Encontrar o produto com maior e menor faturamento
+produto_mais_vendido = faturamento_por_produto.idxmax()
+produto_menos_vendido = faturamento_por_produto.idxmin()
+
+# Exibir os resultados
+print("Faturamento total por produto:")
+print(faturamento_por_produto)
+
+print(f"\nProduto com maior faturamento: {produto_mais_vendido} - R$ {faturamento_por_produto.max():.2f}")
+print(f"Produto com menor faturamento: {produto_menos_vendido} - R$ {faturamento_por_produto.min():.2f}")
+
+
+3 - Código:
+
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
+
+# Endpoint GET /saudacao
+@app.route('/saudacao', methods=['GET']) # /saudacao?nome=
+def saudacao():
+    nome = request.args.get('nome', 'Mundo')  # Se nenhum nome for passado, usa "Mundo"
+    return jsonify({"mensagem": f"Olá, {nome}!"})
+
+# Endpoint POST /soma
+@app.route('/soma', methods=['POST'])
+def soma():
+    dados = request.get_json()
+    
+    if not dados or 'num1' not in dados or 'num2' not in dados:
+        return jsonify({"erro": "Os campos 'num1' e 'num2' são obrigatórios"}), 400
+    
+    try:
+        num1 = float(dados['num1']) # {Passe os parametros "num1": 10, "num2": 5.5}
+        num2 = float(dados['num2'])
+        resultado = num1 + num2
+        return jsonify({"soma": resultado})
+    except ValueError:
+        return jsonify({"erro": "Os valores devem ser numéricos"}), 400
+
+# Executa a API
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', debug=True)
+
+
+4 - Código: 
+
+import asyncio
+import time
+
+async def chamada_rede(id, tempo):
+    print(f"Iniciando chamada {id}...")
+    await asyncio.sleep(tempo)  # Simula uma chamada de rede com tempo variável
+    print(f"Chamada {id} concluída em {tempo} segundos")
+    return tempo
+
+async def executar_chamadas():
+    inicio = time.time()  # Marca o tempo inicial
+
+    # Executa as chamadas de forma concorrente
+    tarefas = [
+        chamada_rede(1, 2),
+        chamada_rede(2, 3),
+        chamada_rede(3, 1)
+    ]
+    await asyncio.gather(*tarefas)  # Aguarda todas as chamadas serem concluídas
+
+    fim = time.time()  # Marca o tempo final
+    tempo_total = fim - inicio
+    print(f"\nTempo total de execução: {tempo_total:.2f} segundos")
+    return tempo_total
+
+# Executa a função assíncrona
+asyncio.run(executar_chamadas())
+
+
+5 - Descreva como você faria o deploy da API Flask criada anteriormente 
+	usando Docker e AWS (EC2 ou Fargate). Explique as etapas principais.
+
+EC2 =
+
+1- Criar um Dockerfile para a API Flask
+2- Criar e testar o container localmente
+3- Subir a imagem para o Amazon ECR (Elastic Container Registry)
+	3.1 - Criar o repositório no ECR se não existir
+	3.2 - Autenticar no ECR
+	3.3 - Tag e push da imagem
+	
+Deploy na AWS EC2 =
+
+1- Criar uma instância EC2 se não existir
+2- Acessar a máquina via SSH e instalar Docker na EC2
+	2.1- Fazer login no ECR na EC2
+3- Baixar e rodar o container na EC2
+
+Deploy na AWS Fargate = 
+
+1- Criar um Cluster ECS via console AWS.
+2- Criar uma Task Definition com:
+	Tipo: Fargate
+	Container: Imagem ECR + porta 5000
+3- Criar um Service ECS usando essa Task.
+4- Configurar um Application Load Balancer (ALB) para rotear o tráfego.
+5- API acessível via ALB DNS.
+
+O fargate tem ma escabilidade automatica, o ec2 é rapido e barato. 
+
+
+6 -DockerFile: 
+
+#imagem base do Python
+FROM python:3.9
+#diretório no contêiner
+WORKDIR /app
+# Copia os arquivos do projeto para dentro do contêiner
+COPY . .
+# Instala as dependências da API
+RUN pip install --no-cache-dir -r requirements.txt
+# Expõe a porta 5000 (onde o Flask rodará, pode ser outra porta tambem)
+EXPOSE 5000
+# Define o comando para rodar a aplicação
+CMD ["python", "WebFrameworks.py"]
+
+
+
+7 - Código: 
+
+from flask import Flask, request, jsonify
+from werkzeug.security import check_password_hash
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+app = Flask(__name__)
+
+# Configuração do Flask-Limiter para evitar força bruta
+limiter = Limiter(get_remote_address, app=app, default_limits=["5 per minute"])
+
+# Simulação de banco de dados com hash seguro para a senha
+USERS_DB = {
+    "admin": "pbkdf2:sha256:260000$Y9LirPL3$..."
+}
+
+@app.route('/login', methods=['POST'])
+@limiter.limit("5 per minute")  # Limite de tentativas
+def login():
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if username in USERS_DB and check_password_hash(USERS_DB[username], password):
+        return jsonify({"message": "Acesso concedido"}), 200
+
+    return jsonify({"message": "Acesso negado"}), 401
+
+if __name__ == '__main__':
+    app.run(host="0.0.0.0", port=5000)
+
+
+
+O problemas eram, o código contém username == 'admin' and password == '1234', com as senhas hardcoded.
+Se a autenticação estivesse ligada a um banco de dados sem prepared statements, poderia ser vulnerável a SQL Injection.
+Executar app.run(debug=True) expõe informações sensíveis em caso de erro.
+O código não limita tentativas de login(pode tentar infinitas combinações de senhas)
+O código compara a senha diretamente como texto puro(Se alguem de má fé obtiver acesso ao banco de dados (se houvesse um), ele veria todas as senhas dos usuários)
+ 
+ Dito isso, existem algumas soluções: 
+ 
+ Usar um banco de dados ou um serviço de autenticação seguro como JWT ou OAuth2.
+ Utilizar hashing seguro com bcrypt ou werkzeug.security.generate_password_hash
+ Implementar um mecanismo de rate-limiting com Flask-Limiter
+ Remover debug=True em produção e usar variáveis de ambiente
+ Usar SQLAlchemy ou outra ORM que previna injeções SQL
+ 
+ 
+ 8 -  Descreva uma situação em que você teve que resolver um problema sob pressão. Como você lidou com o estresse e qual foi o resultado?
+ 
+ Durante o período em que fui estagiário em uma consultoria, era responsável por um produto que efetuava OCR em alguns arquivos. Com isso, havia uma grande responsabilidade, pois todos os clientes que utilizavam esse processo precisavam do OCR.
+Grande parte dos clientes finais era da área fiscal, ou seja, tinham um dia de fechamento, que muitas vezes ocorria na mesma data. Isso gerava um volume absurdo em determinados dias, criando uma fila na máquina para o processamento. Até que, em um desses dias, um cliente subiu por engano 90 mil arquivos no FTP, o que fez o sistema cair.
+Ao perceber o problema, comuniquei meu sênior na época e entramos em uma call. Para ser sincero, fiquei tranquilo, pois não podia me desesperar, já que apenas eu mexia no projeto. Então, precisava manter a calma e pensar em uma solução.
+Conseguimos entrar em contato com o cliente para validar se era realmente necessário processar todos aqueles arquivos. Além disso, já me preparei para que, caso um cenário parecido acontecesse novamente, estivéssemos prontos. No final, conseguimos estabilizar o sistema.
+Nossa maior preocupação foi descobrir a origem dos arquivos, pois não monitorávamos com exatidão de onde eles eram recebidos. Mas levo esse caso como um grande aprendizado, e hoje busco prever melhor possíveis cenários para evitar esse tipo de problema.
